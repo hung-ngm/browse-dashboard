@@ -17,8 +17,10 @@ import {
 } from "@/lib/extensionBridge";
 import { downloadExtensionZip } from "@/lib/extensionZip";
 import { clearHistoryCache, loadHistoryCache, saveHistoryCache } from "@/lib/historyStore";
+import { fetchSummary } from "@/lib/apiClient";
+import { generateSyncKey } from "@/lib/syncKey";
 
-type Source = "none" | "extension" | "file" | "cache";
+type Source = "none" | "extension" | "file" | "cache" | "server";
 
 function extensionToNormalized(entries: ExtensionHistoryEntry[]): NormalizedVisit[] {
   return entries.map((e) => ({
@@ -34,22 +36,54 @@ export default function Home() {
   const [days, setDays] = useState(30);
   const [source, setSource] = useState<Source>("none");
   const [visits, setVisits] = useState<NormalizedVisit[]>([]);
+
+  // Cross-device sync
+  const [syncKey, setSyncKey] = useState("");
+  const [serverLastSync, setServerLastSync] = useState<string | null>(null);
+
+  // Extension/local
   const [extId, setExtId] = useState("");
   const [extConnected, setExtConnected] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileLoaded, setFileLoaded] = useState(false);
   const [cacheSavedAt, setCacheSavedAt] = useState<number | null>(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
 
-  // On mount: (1) try extension (if known), else (2) load from IndexedDB cache
+  // On mount: (1) try server via Sync Key, else (2) try extension, else (3) load from IndexedDB cache
   useEffect(() => {
     const savedId = typeof window !== "undefined" ? localStorage.getItem("extensionId") || "" : "";
     if (savedId) setExtId(savedId);
 
+    const savedSyncKey = typeof window !== "undefined" ? localStorage.getItem("syncKey") || "" : "";
+    if (savedSyncKey) setSyncKey(savedSyncKey);
+
     async function boot() {
-      // 1) Prefer extension (freshest)
+      // 1) Prefer server if Sync Key exists (works on phone)
+      if (savedSyncKey) {
+        try {
+          const summary = await fetchSummary(savedSyncKey, days);
+          const v: NormalizedVisit[] = summary.domainDaily.map((r) => ({
+            url: "",
+            title: r.domain,
+            domain: r.domain,
+            date: r.day,
+            visits: r.visits,
+          }));
+          setVisits(v);
+          setServerLastSync(summary.lastSync);
+          setSource("server");
+          setLoadedFromCache(false);
+          await saveHistoryCache({ source: "cache", visits: v, lastSync: summary.lastSync ? Date.parse(summary.lastSync) : null });
+          return;
+        } catch {
+          // fall through to local methods
+        }
+      }
+
+      // 2) Extension
       const extRes = await getHistoryFromExtension(savedId || undefined);
       if (extRes) {
         const v = extensionToNormalized(extRes.data);
@@ -62,7 +96,7 @@ export default function Home() {
         return;
       }
 
-      // 2) Fallback to persistent cache
+      // 3) Cache
       const cached = await loadHistoryCache();
       if (cached?.visits?.length) {
         setVisits(cached.visits);
@@ -74,6 +108,7 @@ export default function Home() {
     }
 
     boot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const connectExtension = useCallback(async () => {
@@ -201,6 +236,73 @@ export default function Home() {
           )}
           {loadedFromCache && cacheSavedAt && (
             <span className="text-xs text-gray-500">Loaded from cache: {new Date(cacheSavedAt).toLocaleString()}</span>
+          )}
+        </div>
+
+        {/* Cross-device sync (server-backed) */}
+        <div className="bg-gray-950 rounded-lg p-4 border border-gray-800 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm font-medium text-gray-200">📱 Cross-device Sync Key (Postgres)</div>
+            {source === "server" && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/40 text-purple-300">
+                Server mode
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500">
+            Paste the same Sync Key on your phone to view your MacBook browsing stats.
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              value={syncKey}
+              onChange={(e) => setSyncKey(e.target.value)}
+              placeholder="bd_sk_..."
+              className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder:text-gray-600"
+            />
+            <button
+              onClick={async () => {
+                const k = generateSyncKey();
+                setSyncKey(k);
+                localStorage.setItem("syncKey", k);
+              }}
+              className="px-4 py-2 bg-gray-800 text-gray-200 text-sm font-medium rounded-lg hover:bg-gray-700"
+            >
+              Generate
+            </button>
+            <button
+              onClick={async () => {
+                setLoading(true);
+                setError(null);
+                try {
+                  const k = syncKey.trim();
+                  if (!k) throw new Error("Missing Sync Key");
+                  localStorage.setItem("syncKey", k);
+                  const summary = await fetchSummary(k, days);
+                  const v: NormalizedVisit[] = summary.domainDaily.map((r) => ({
+                    url: "",
+                    title: r.domain,
+                    domain: r.domain,
+                    date: r.day,
+                    visits: r.visits,
+                  }));
+                  setVisits(v);
+                  setServerLastSync(summary.lastSync);
+                  setSource("server");
+                  setLoadedFromCache(false);
+                  await saveHistoryCache({ source: "cache", visits: v, lastSync: summary.lastSync ? Date.parse(summary.lastSync) : null });
+                } catch (e: any) {
+                  setError(e?.message || "Failed to load from server");
+                }
+                setLoading(false);
+              }}
+              disabled={loading}
+              className="px-4 py-2 bg-purple-700 text-white text-sm font-medium rounded-lg hover:bg-purple-600 disabled:opacity-40"
+            >
+              Load
+            </button>
+          </div>
+          {serverLastSync && (
+            <div className="text-xs text-gray-500">Server last sync: {new Date(serverLastSync).toLocaleString()}</div>
           )}
         </div>
 

@@ -28,6 +28,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Cross-device Sync (Mac → Phone)
+
+This project supports syncing aggregated browsing stats to **Vercel Postgres** so you can view your MacBook Chrome history on your phone.
+
+- Generate a **Sync Key** in the dashboard
+- Paste the same key into the Chrome extension popup
+- Open the dashboard on your phone and paste the same key → it loads from the server
+
 ## Chrome Extension Setup
 
 1. Open `chrome://extensions` in Chrome

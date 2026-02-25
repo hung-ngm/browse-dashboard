@@ -2,40 +2,42 @@
 <html>
 <head>
   <style>
-    body {
-      width: 280px;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a0a0a;
-      color: #e5e5e5;
-      margin: 0;
-    }
-    h2 { font-size: 16px; margin: 0 0 12px 0; }
-    .stat { color: #9ca3af; font-size: 13px; margin: 4px 0; }
-    .stat strong { color: #e5e5e5; }
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 12px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    button:hover { opacity: 0.85; }
-    .btn-sync { background: #3b82f6; color: white; }
-    .btn-open { background: #1f2937; color: #d1d5db; margin-top: 8px; }
-    .syncing { opacity: 0.6; pointer-events: none; }
+    body{width:320px;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#e5e5e5;margin:0}
+    h2{font-size:16px;margin:0 0 12px}
+    .stat{color:#9ca3af;font-size:13px;margin:4px 0}
+    .stat strong{color:#e5e5e5}
+    label{display:block;color:#9ca3af;font-size:12px;margin-top:12px;margin-bottom:6px}
+    input,select{width:100%;box-sizing:border-box;background:#111827;border:1px solid #374151;border-radius:8px;padding:8px 10px;color:#e5e5e5;font-size:13px}
+    button{width:100%;padding:10px;margin-top:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-sync{background:#3b82f6;color:#fff}
+    .btn-open{background:#1f2937;color:#d1d5db;margin-top:8px}
+    .hint{color:#6b7280;font-size:11px;margin-top:6px;line-height:1.3}
   </style>
 </head>
 <body>
-  <h2>🌐 Browse Dashboard</h2>
-  <div class="stat">Last sync: <strong id="lastSync">never</strong></div>
-  <div class="stat">URLs tracked: <strong id="totalUrls">0</strong></div>
+  <h2>🌐 Browse Dashboard Sync</h2>
+  <div class="stat">Last local sync: <strong id="lastSync">never</strong></div>
+  <div class="stat">Last server sync: <strong id="lastServerSync">never</strong></div>
+  <div class="stat">URLs scanned: <strong id="totalUrls">0</strong></div>
+
+  <label>Sync Key (for cross-device viewing)</label>
+  <input id="syncKey" placeholder="bd_sk_..." />
+  <div class="hint">Same key is used on your phone dashboard to view your Mac history.</div>
+
+  <label>Window</label>
+  <select id="windowDays">
+    <option value="7">Last 7 days</option>
+    <option value="14">Last 14 days</option>
+    <option value="30" selected>Last 30 days</option>
+    <option value="60">Last 60 days</option>
+    <option value="90">Last 90 days</option>
+  </select>
+
   <button class="btn-sync" id="syncBtn">Sync Now</button>
   <button class="btn-open" id="openBtn">Open Dashboard</button>
+
+  <div class="hint" id="err" style="color:#fca5a5;display:none"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>
