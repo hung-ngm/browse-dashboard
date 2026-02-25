@@ -42,6 +42,8 @@ The extension syncs your history automatically every 6 hours. Use the popup to t
 
 You can also upload Chrome's **History** SQLite database file directly.
 
+The dashboard will persist your parsed data in **IndexedDB**, so you typically only need to upload once per browser profile.
+
 **Important:** Chrome locks this file while running — close Chrome first, or copy the file.
 
 | OS | Path |

@@ -16,8 +16,9 @@ import {
   ExtensionHistoryEntry,
 } from "@/lib/extensionBridge";
 import { downloadExtensionZip } from "@/lib/extensionZip";
+import { clearHistoryCache, loadHistoryCache, saveHistoryCache } from "@/lib/historyStore";
 
-type Source = "none" | "extension" | "file";
+type Source = "none" | "extension" | "file" | "cache";
 
 function extensionToNormalized(entries: ExtensionHistoryEntry[]): NormalizedVisit[] {
   return entries.map((e) => ({
@@ -39,22 +40,40 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileLoaded, setFileLoaded] = useState(false);
+  const [cacheSavedAt, setCacheSavedAt] = useState<number | null>(null);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
-  // Try to connect to extension on mount
+  // On mount: (1) try extension (if known), else (2) load from IndexedDB cache
   useEffect(() => {
     const savedId = typeof window !== "undefined" ? localStorage.getItem("extensionId") || "" : "";
     if (savedId) setExtId(savedId);
 
-    async function tryConnect() {
-      const res = await getHistoryFromExtension(savedId || undefined);
-      if (res) {
+    async function boot() {
+      // 1) Prefer extension (freshest)
+      const extRes = await getHistoryFromExtension(savedId || undefined);
+      if (extRes) {
+        const v = extensionToNormalized(extRes.data);
         setExtConnected(true);
-        setVisits(extensionToNormalized(res.data));
-        setLastSync(res.lastSync);
+        setVisits(v);
+        setLastSync(extRes.lastSync);
         setSource("extension");
+        setLoadedFromCache(false);
+        await saveHistoryCache({ source: "extension", visits: v, lastSync: extRes.lastSync, extId: savedId || undefined });
+        return;
+      }
+
+      // 2) Fallback to persistent cache
+      const cached = await loadHistoryCache();
+      if (cached?.visits?.length) {
+        setVisits(cached.visits);
+        setLastSync(cached.lastSync);
+        setSource("cache");
+        setCacheSavedAt(cached.savedAt);
+        setLoadedFromCache(true);
       }
     }
-    tryConnect();
+
+    boot();
   }, []);
 
   const connectExtension = useCallback(async () => {
@@ -64,10 +83,13 @@ export default function Home() {
     localStorage.setItem("extensionId", extId);
     const res = await getHistoryFromExtension(extId);
     if (res) {
+      const v = extensionToNormalized(res.data);
       setExtConnected(true);
-      setVisits(extensionToNormalized(res.data));
+      setVisits(v);
       setLastSync(res.lastSync);
       setSource("extension");
+      setLoadedFromCache(false);
+      await saveHistoryCache({ source: "extension", visits: v, lastSync: res.lastSync, extId });
     } else {
       setError("Could not connect. Check the extension ID and ensure the extension is installed.");
     }
@@ -79,8 +101,12 @@ export default function Home() {
     setLoading(true);
     const res = await syncNowViaExtension(extId, days);
     if (res) {
-      setVisits(extensionToNormalized(res.data));
+      const v = extensionToNormalized(res.data);
+      setVisits(v);
       setLastSync(res.lastSync);
+      setSource("extension");
+      setLoadedFromCache(false);
+      await saveHistoryCache({ source: "extension", visits: v, lastSync: res.lastSync, extId });
     }
     setLoading(false);
   }, [extId, days]);
@@ -109,9 +135,13 @@ export default function Home() {
         typedCount: Number(r[idx("typedCount")] ?? 0),
         lastVisitTime: Number(r[idx("lastVisitTime")] ?? 0),
       }));
-      setVisits(normalizeRowsToVisits(mapped, days));
+      // Persist a larger window so you can change the dashboard window later without re-uploading
+      const v = normalizeRowsToVisits(mapped, 365);
+      setVisits(v);
       setSource("file");
       setFileLoaded(true);
+      setLoadedFromCache(false);
+      await saveHistoryCache({ source: "file", visits: v, lastSync: Date.now() });
     } catch (e: any) {
       setError(e?.message || "Failed to parse");
     }
@@ -167,9 +197,10 @@ export default function Home() {
             </span>
           )}
           {lastSync && (
-            <span className="text-xs text-gray-500">
-              Last sync: {new Date(lastSync).toLocaleString()}
-            </span>
+            <span className="text-xs text-gray-500">Last sync: {new Date(lastSync).toLocaleString()}</span>
+          )}
+          {loadedFromCache && cacheSavedAt && (
+            <span className="text-xs text-gray-500">Loaded from cache: {new Date(cacheSavedAt).toLocaleString()}</span>
           )}
         </div>
 
@@ -235,17 +266,40 @@ export default function Home() {
           </div>
         </div>
 
-        {/* File upload fallback */}
-        <div className="border-t border-gray-800 pt-3">
-          <div className="text-xs text-gray-500 mb-2">
-            Or upload Chrome&apos;s History SQLite file manually (processed locally, nothing uploaded):
+        {/* File upload fallback + cache controls */}
+        <div className="border-t border-gray-800 pt-3 space-y-3">
+          <div className="text-xs text-gray-500">
+            Or upload Chrome&apos;s History SQLite file manually (processed locally, nothing uploaded). We&apos;ll save it in your browser so you only upload once.
           </div>
-          <input
-            type="file"
-            accept="*/*"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
-            className="block text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-800 file:text-gray-200 hover:file:bg-gray-700"
-          />
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            <input
+              type="file"
+              accept="*/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFile(f);
+              }}
+              className="block text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-800 file:text-gray-200 hover:file:bg-gray-700"
+            />
+            <button
+              onClick={async () => {
+                await clearHistoryCache();
+                setVisits([]);
+                setSource("none");
+                setLastSync(null);
+                setCacheSavedAt(null);
+                setLoadedFromCache(false);
+                setFileLoaded(false);
+                setExtConnected(false);
+              }}
+              className="px-4 py-2 bg-red-900/40 text-red-300 text-sm font-medium rounded-lg hover:bg-red-900/55 transition-colors"
+            >
+              Clear saved data
+            </button>
+          </div>
+          <div className="text-xs text-gray-600">
+            Note: saved data lives in this browser profile (IndexedDB). Clearing site data will remove it.
+          </div>
         </div>
 
         {error && <div className="text-sm text-red-400">{error}</div>}
