@@ -6,7 +6,10 @@ export async function fetchSummary(syncKey: string, days: number) {
   const res = await fetch(`${API_BASE}/api/sync/summary?days=${encodeURIComponent(days)}`, {
     headers: { Authorization: `Bearer ${syncKey}` },
   });
-  if (!res.ok) throw new Error(`Summary failed (${res.status})`);
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Summary failed (${res.status}): ${txt || res.statusText}`);
+  }
   return (await res.json()) as {
     ok: boolean;
     days: number;
