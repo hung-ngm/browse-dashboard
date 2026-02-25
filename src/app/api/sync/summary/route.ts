@@ -3,6 +3,23 @@ import { getPool } from "@/lib/server/db";
 import { corsHeaders } from "@/lib/server/cors";
 import { getBearerToken, userIdFromSyncKey } from "@/lib/server/auth";
 
+export const runtime = "nodejs";
+
+async function ensureSchema() {
+  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS domain_daily (
+      user_id TEXT NOT NULL,
+      day DATE NOT NULL,
+      domain TEXT NOT NULL,
+      visits INTEGER NOT NULL,
+      last_seen TIMESTAMPTZ NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, day, domain)
+    );
+  `);
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
@@ -19,6 +36,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const days = Math.max(1, Math.min(365, Number(url.searchParams.get("days") || 30)));
 
+    await ensureSchema();
     const pool = getPool();
 
     // Fetch rows

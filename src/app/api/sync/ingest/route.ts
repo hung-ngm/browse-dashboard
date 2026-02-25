@@ -3,6 +3,8 @@ import { getPool } from "@/lib/server/db";
 import { corsHeaders } from "@/lib/server/cors";
 import { getBearerToken, userIdFromSyncKey } from "@/lib/server/auth";
 
+export const runtime = "nodejs";
+
 type IngestRow = {
   day: string; // YYYY-MM-DD
   domain: string;
