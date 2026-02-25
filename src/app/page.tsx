@@ -15,6 +15,7 @@ import {
   getHistoryFromExtension, syncNowViaExtension,
   ExtensionHistoryEntry,
 } from "@/lib/extensionBridge";
+import { downloadExtensionZip } from "@/lib/extensionZip";
 
 type Source = "none" | "extension" | "file";
 
@@ -171,6 +172,24 @@ export default function Home() {
             </span>
           )}
         </div>
+
+        {/* Extension setup */}
+        {!extConnected && (
+          <div className="bg-gray-950 rounded-lg p-4 border border-gray-800 space-y-3">
+            <div className="text-sm font-medium text-gray-200">⚡ Quick Setup (one time)</div>
+            <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+              <li>
+                <button onClick={downloadExtensionZip} className="text-blue-400 underline underline-offset-2 hover:text-blue-300">
+                  Download extension zip
+                </button>{" "}
+                and unzip it
+              </li>
+              <li>Open <code className="text-gray-300">chrome://extensions</code> → enable <strong className="text-gray-200">Developer mode</strong></li>
+              <li>Click <strong className="text-gray-200">Load unpacked</strong> → select the unzipped folder</li>
+              <li>Copy the <strong className="text-gray-200">Extension ID</strong> and paste it below</li>
+            </ol>
+          </div>
+        )}
 
         {/* Extension connect */}
         <div className="flex flex-col sm:flex-row gap-3">
