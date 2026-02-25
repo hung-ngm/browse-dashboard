@@ -1,20 +1,23 @@
 # Browse Dashboard (authored by HungClaw)
 
-A dashboard showing your real Chrome browsing history over the last N days. Data is parsed **locally in your browser** from Chrome's `History` SQLite DB (nothing is uploaded).
+A dashboard showing your real Chrome browsing history. Data is processed **locally in your browser** — nothing is sent to any server.
 
 ## Features
 
 - 📊 Daily activity area chart
 - 📈 Top sites bar chart
 - 📋 Full site table with visit stats
-- 🔒 Privacy-friendly: parses the file client-side
+- 🔌 **Chrome Extension** for automatic history sync
+- 📁 Manual SQLite file upload as fallback
+- 🔒 Privacy-friendly: all parsing is client-side
 
 ## Tech Stack
 
 - **Next.js 16** with App Router
 - **Tailwind CSS 4**
 - **Recharts** for data visualization
-- **TypeScript**
+- **Chrome Extension** (Manifest V3) with `chrome.history` API
+- **sql.js** for client-side SQLite parsing
 
 ## Getting Started
 
@@ -25,20 +28,28 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Using Real Data (Chrome)
+## Chrome Extension Setup
 
-You need Chrome's **History** SQLite database file.
+1. Open `chrome://extensions` in Chrome
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked** and select the `extension/` folder
+4. Copy the **Extension ID** shown on the card
+5. Open the dashboard and paste the Extension ID to connect
 
-Important: Chrome keeps this file locked while running. **Close Chrome first**, or copy the file somewhere else and upload the copy.
+The extension syncs your history automatically every 6 hours. Use the popup to trigger a manual sync.
 
-Common locations:
+## Manual File Upload (Fallback)
 
-- **macOS:** `~/Library/Application Support/Google/Chrome/Default/History`
-- **Windows:** `%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\History`
-- **Linux:** `~/.config/google-chrome/Default/History`
+You can also upload Chrome's **History** SQLite database file directly.
 
-Then open the app and upload the file.
+**Important:** Chrome locks this file while running — close Chrome first, or copy the file.
+
+| OS | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Google/Chrome/Default/History` |
+| Windows | `%LOCALAPPDATA%\Google\Chrome\User Data\Default\History` |
+| Linux | `~/.config/google-chrome/Default/History` |
 
 ## Deployment
 
-Deployed on [Vercel](https://browse-dashboard.vercel.app).
+Live at [browse-dashboard.vercel.app](https://browse-dashboard.vercel.app).

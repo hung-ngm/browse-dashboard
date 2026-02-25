@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Browse Dashboard Sync",
+  "version": "1.0.0",
+  "description": "Auto-syncs Chrome browsing history to Browse Dashboard",
+  "permissions": ["history", "storage", "alarms"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon48.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://browse-dashboard.vercel.app/*",
+      "http://localhost:3000/*"
+    ]
+  }
+}
