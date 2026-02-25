@@ -16,6 +16,13 @@ export function getPool() {
     );
   }
 
-  pool = new Pool({ connectionString, max: 5 });
+  // Neon/Vercel Postgres typically requires SSL in production.
+  // pg will usually infer this from the connection string, but we also set it explicitly
+  // to avoid "no pg_hba.conf entry" / TLS-related failures in serverless.
+  const ssl = connectionString.includes("sslmode=require")
+    ? { rejectUnauthorized: false }
+    : undefined;
+
+  pool = new Pool({ connectionString, ssl, max: 5, connectionTimeoutMillis: 10_000 });
   return pool;
 }
